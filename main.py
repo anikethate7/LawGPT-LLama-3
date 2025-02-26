@@ -21,7 +21,7 @@ load_dotenv()
 os.environ['GOOGLE_API_KEY'] = os.getenv("GOOGLE_API_KEY")
 groq_api_key = os.getenv("GROQ_API_KEY")
 
-st.set_page_config(page_title="LawGPT")
+st.set_page_config(page_title="NyayGURU")
 
 # Dictionary of categories
 categories = {
@@ -39,50 +39,69 @@ if "selected_category" not in st.session_state:
 if "messages_per_category" not in st.session_state:
     st.session_state.messages_per_category = {category: [] for category in categories.keys()}
 
-# Enhanced Sidebar UI Styling
+# Enhanced Sidebar UI Styling with Gray Tone
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
         width: 280px !important;
-        background: linear-gradient(135deg, #18182b, #25253c) !important;
-        color: white;
+        background: linear-gradient(135deg, #f0f0f0, #dcdcdc) !important;
+        color: black;
         padding: 20px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        border-right: 2px solid rgba(0, 0, 0, 0.1);
     }
-
+    
+    @media (prefers-color-scheme: dark) {
+        [data-testid="stSidebar"] {
+            background: linear-gradient(135deg, #2c2c2c, #3a3a3a) !important;
+            color: white;
+            border-right: 2px solid rgba(255, 255, 255, 0.1);
+        }
+    }
+    
     .sidebar-title {
         font-size: 26px;
         font-weight: bold;
         text-align: center;
-        color: white;
         margin-bottom: 15px;
         padding-bottom: 10px;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 2px solid rgba(0, 0, 0, 0.2);
     }
-
+    
+    @media (prefers-color-scheme: dark) {
+        .sidebar-title {
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+    }
+    
     .sidebar-content {
         flex-grow: 1;
         display: flex;
         flex-direction: column;
         gap: 10px;
     }
-
+    
     .sidebar-footer {
         text-align: center;
-        color: rgba(255, 255, 255, 0.7);
         font-size: 14px;
         margin-top: 20px;
         padding-top: 10px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        border-top: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        .sidebar-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Sidebar UI
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">⚖️ LawGPT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title">⚖️ NyayGURU</div>', unsafe_allow_html=True)
 
     with st.container():
         st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
