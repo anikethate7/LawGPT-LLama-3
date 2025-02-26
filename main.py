@@ -25,11 +25,11 @@ st.set_page_config(page_title="NyayGURU")
 
 # Dictionary of categories
 categories = {
-    "📖 Know Your Rights": KYR,
+    "📚 Know Your Rights": KYR,
     "⚖️ Criminal Law": criminal,
     "🖥️ Cyber Law": cyber,
     "🏡 Property Law": property,
-    "📜 Consumer Law": consumer,
+    "📛 Consumer Law": consumer,
 }
 
 # Initialize session state
@@ -39,65 +39,68 @@ if "selected_category" not in st.session_state:
 if "messages_per_category" not in st.session_state:
     st.session_state.messages_per_category = {category: [] for category in categories.keys()}
 
-# Enhanced Sidebar UI Styling with Gray Tone
+# Ensure sidebar remains the same in both light and dark mode
+# Ensure sidebar remains same in both light and dark mode
 st.markdown("""
     <style>
+    /* Sidebar styling */
     [data-testid="stSidebar"] {
         width: 280px !important;
-        background: linear-gradient(135deg, #f0f0f0, #dcdcdc) !important;
-        color: black;
+        background: #18182b !important;  /* Dark background */
+        color: white !important;
         padding: 20px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        border-right: 2px solid rgba(0, 0, 0, 0.1);
     }
-    
-    @media (prefers-color-scheme: dark) {
-        [data-testid="stSidebar"] {
-            background: linear-gradient(135deg, #2c2c2c, #3a3a3a) !important;
-            color: white;
-            border-right: 2px solid rgba(255, 255, 255, 0.1);
-        }
-    }
-    
+
+    /* Sidebar Title */
     .sidebar-title {
         font-size: 26px;
         font-weight: bold;
         text-align: center;
+        color: white !important;
         margin-bottom: 15px;
         padding-bottom: 10px;
-        border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
     }
-    
-    @media (prefers-color-scheme: dark) {
-        .sidebar-title {
-            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-        }
+
+    /* Sidebar buttons */
+    .stButton>button {
+        width: 100% !important;
+        background-color: #25253c !important; /* Dark gray */
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        border-radius: 10px !important;
+        padding: 10px !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
     }
-    
-    .sidebar-content {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
+
+    /* Hover effect */
+    .stButton>button:hover {
+        background-color: #303048 !important; /* Slightly lighter gray */
+        color: white !important;
     }
-    
+
+    /* Sidebar Footer */
     .sidebar-footer {
         text-align: center;
+        color: rgba(255, 255, 255, 0.7) !important;
         font-size: 14px;
         margin-top: 20px;
         padding-top: 10px;
-        border-top: 1px solid rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
     }
-    
-    @media (prefers-color-scheme: dark) {
-        .sidebar-footer {
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
+
+    /* Ensure consistency in light mode */
+    html[theme="light"] [data-testid="stSidebar"] {
+        background: #18182b !important;
+        color: white !important;
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # Sidebar UI
 with st.sidebar:
@@ -105,13 +108,12 @@ with st.sidebar:
 
     with st.container():
         st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
-        for idx, category in enumerate(categories.keys()):  # Ensure unique keys
+        for idx, category in enumerate(categories.keys()):
             if st.button(category, use_container_width=True, key=f"button_{idx}"):
                 st.session_state.selected_category = category
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="sidebar-footer">🛡️ Stay legally informed.</div>', unsafe_allow_html=True)
-
 
 # Function to run chatbot
 def run_chatbot():
