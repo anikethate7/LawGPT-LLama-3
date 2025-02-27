@@ -32,6 +32,13 @@ categories = {
     "📛 Consumer Law": consumer,
 }
 
+# Supported languages
+languages = {
+    "English": "en",
+    "Hindi": "hi",
+    "Marathi": "mr",
+}
+
 # Initialize session state
 if "selected_category" not in st.session_state:
     st.session_state.selected_category = list(categories.keys())[0]
@@ -39,8 +46,10 @@ if "selected_category" not in st.session_state:
 if "messages_per_category" not in st.session_state:
     st.session_state.messages_per_category = {category: [] for category in categories.keys()}
 
+if "selected_language" not in st.session_state:
+    st.session_state.selected_language = "English"
+
 # Ensure sidebar remains the same in both light and dark mode
-# Ensure sidebar remains same in both light and dark mode
 st.markdown("""
     <style>
     /* Sidebar styling */
@@ -93,6 +102,13 @@ st.markdown("""
         border-top: 1px solid rgba(255, 255, 255, 0.2);
     }
 
+    /* Language selector */
+    .language-selector {
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
     /* Ensure consistency in light mode */
     html[theme="light"] [data-testid="stSidebar"] {
         background: #18182b !important;
@@ -112,12 +128,41 @@ with st.sidebar:
             if st.button(category, use_container_width=True, key=f"button_{idx}"):
                 st.session_state.selected_category = category
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Language selector
+    st.markdown('<div class="language-selector">', unsafe_allow_html=True)
+    st.write("🌐 Select Language:")
+    selected_language = st.selectbox(
+        label="Language",
+        options=list(languages.keys()),
+        index=list(languages.keys()).index(st.session_state.selected_language),
+        label_visibility="collapsed"
+    )
+    if selected_language != st.session_state.selected_language:
+        st.session_state.selected_language = selected_language
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="sidebar-footer">🛡️ Stay legally informed.</div>', unsafe_allow_html=True)
+
+# Translation functions using LLM
+def translate_text(text, source_lang, target_lang):
+    if source_lang == target_lang:
+        return text
+    
+    llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
+    translation_prompt = f"""
+    Translate the following text from {source_lang} to {target_lang}. 
+    Keep the meaning intact and maintain legal terminology accuracy:
+    
+    {text}
+    """
+    response = llm.invoke(translation_prompt)
+    return response.content
 
 # Function to run chatbot
 def run_chatbot():
     current_category = st.session_state.selected_category
+    current_language = st.session_state.selected_language
 
     if "memory" not in st.session_state:
         st.session_state.memory = ConversationBufferWindowMemory(k=2, memory_key="chat_history", return_messages=True)
@@ -127,26 +172,14 @@ def run_chatbot():
     db = FAISS.load_local("my_vector_store", embeddings, allow_dangerous_deserialization=True)
     db_retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 
-    # Define prompt template
-    prompt_template = """
-    <s>[INST]This is a chat template. As a legal chatbot, your primary objective is to provide accurate and concise information based on the user's questions. 
-    CONTEXT: {context}
-    CHAT HISTORY: {chat_history}
-    QUESTION: {question}
-    ANSWER:
-    </s>[INST]
-    """
-    prompt = PromptTemplate(template=prompt_template, input_variables=['context', 'question', 'chat_history'])
-
     # Initialize LLM
     llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
-
-    # Set up QA chain
+    
+    # Set up QA chain (without custom prompt for now, let's simplify)
     qa = ConversationalRetrievalChain.from_llm(
         llm=llm,
         memory=st.session_state.memory,
-        retriever=db_retriever,
-        combine_docs_chain_kwargs={'prompt': prompt}
+        retriever=db_retriever
     )
 
     # Display previous messages for the selected category
@@ -155,24 +188,50 @@ def run_chatbot():
             st.write(message.get("content"))
 
     # Chat input
-    input_prompt = st.chat_input("Ask a legal question...")
+    input_placeholder = f"Ask a legal question in {current_language}..."
+    input_prompt = st.chat_input(input_placeholder)
+    
     if input_prompt:
+        # Display user message
         with st.chat_message("user"):
             st.write(input_prompt)
+        
+        # Store original user message
         st.session_state.messages_per_category[current_category].append({"role": "user", "content": input_prompt})
-
+        
+        # Translate to English for processing if not already in English
+        query_to_process = input_prompt
+        if current_language != "English":
+            query_to_process = translate_text(input_prompt, current_language, "English")
+        
+        # Process the query
         with st.chat_message("assistant"):
-            with st.status("Thinking 💡...", expanded=True):
-                result = qa.invoke(input=input_prompt)
+            with st.status(f"Thinking 💡...", expanded=True):
+                # Use the ConversationalRetrievalChain with only the query
+                result = qa.invoke({"question": query_to_process})
+                
+                # Get the response
+                english_response = result["answer"]
+                
+                # Translate back to user's language if needed
+                final_response = english_response
+                if current_language != "English":
+                    final_response = translate_text(english_response, "English", current_language)
+                
+                # Display with typing effect
                 message_placeholder = st.empty()
                 full_response = ""
-
-                for chunk in result["answer"]:
-                    full_response += chunk
-                    time.sleep(0.02)
+                
+                # Process character by character for the typing effect
+                for char in final_response:
+                    full_response += char
+                    time.sleep(0.01)  # Slightly faster typing effect
                     message_placeholder.markdown(full_response + " ▌")
-
-        st.session_state.messages_per_category[current_category].append({"role": "assistant", "content": result["answer"]})
+                
+                message_placeholder.markdown(full_response)
+                
+        # Store response
+        st.session_state.messages_per_category[current_category].append({"role": "assistant", "content": full_response})
 
 # Call the show function of the selected category
 categories[st.session_state.selected_category].show(run_chatbot)

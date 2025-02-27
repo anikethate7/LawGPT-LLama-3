@@ -8,3 +8,6 @@ streamlit
 langchain_community
 python-dotenv
 pypdf
+firebase-admin
+pyrebase4
+python-dotenv

@@ -1,3 +1,4 @@
 *.env
 venv/
 attachments/
+serviceAccount.json
