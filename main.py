@@ -3,7 +3,6 @@ import os
 import time
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.chains import ConversationalRetrievalChain
@@ -128,7 +127,7 @@ with st.sidebar:
             if st.button(category, use_container_width=True, key=f"button_{idx}"):
                 st.session_state.selected_category = category
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     # Language selector
     st.markdown('<div class="language-selector">', unsafe_allow_html=True)
     st.write("🌐 Select Language:")
@@ -144,38 +143,57 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-footer">🛡️ Stay legally informed.</div>', unsafe_allow_html=True)
 
-# Translation functions using LLM
+@st.cache_resource
+def load_embeddings():
+    return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+@st.cache_resource
+def load_vector_store(_embeddings):
+    # The embeddings are not hashable, so we prevent Streamlit from hashing them.
+    return FAISS.load_local("my_vector_store", _embeddings, allow_dangerous_deserialization=True)
+
+@st.cache_resource
+def load_llm():
+    return ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
+
+@st.cache_data
 def translate_text(text, source_lang, target_lang):
     if source_lang == target_lang:
         return text
-    
+
     llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
     translation_prompt = f"""
+    You are a professional translator specializing in legal documents. 
     Translate the following text from {source_lang} to {target_lang}. 
-    Keep the meaning intact and maintain legal terminology accuracy:
-    
+    Keep the meaning intact and maintain legal terminology accuracy.
+    **Respond with ONLY the translated text, without any introductory phrases or explanations.**
+
     {text}
     """
     response = llm.invoke(translation_prompt)
     return response.content
 
+
 # Function to run chatbot
 def run_chatbot():
     current_category = st.session_state.selected_category
     current_language = st.session_state.selected_language
+    language_code = languages[current_language]  # Get the language code
 
     if "memory" not in st.session_state:
-        st.session_state.memory = ConversationBufferWindowMemory(k=2, memory_key="chat_history", return_messages=True)
+        st.session_state.memory = ConversationBufferWindowMemory(
+            k=2, memory_key="chat_history", return_messages=True
+        )
 
     # Initialize embeddings and vector store
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    db = FAISS.load_local("my_vector_store", embeddings, allow_dangerous_deserialization=True)
+    embeddings = load_embeddings()
+    db = load_vector_store(embeddings)
     db_retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 
     # Initialize LLM
-    llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
-    
-    # Set up QA chain (without custom prompt for now, let's simplify)
+    llm = load_llm()
+
+    # Set up QA chain
     qa = ConversationalRetrievalChain.from_llm(
         llm=llm,
         memory=st.session_state.memory,
@@ -190,48 +208,44 @@ def run_chatbot():
     # Chat input
     input_placeholder = f"Ask a legal question in {current_language}..."
     input_prompt = st.chat_input(input_placeholder)
-    
+
     if input_prompt:
         # Display user message
         with st.chat_message("user"):
             st.write(input_prompt)
-        
+
         # Store original user message
         st.session_state.messages_per_category[current_category].append({"role": "user", "content": input_prompt})
-        
-        # Translate to English for processing if not already in English
-        query_to_process = input_prompt
-        if current_language != "English":
-            query_to_process = translate_text(input_prompt, current_language, "English")
-        
+
         # Process the query
         with st.chat_message("assistant"):
             with st.status(f"Thinking 💡...", expanded=True):
-                # Use the ConversationalRetrievalChain with only the query
-                result = qa.invoke({"question": query_to_process})
-                
+                # Use the ConversationalRetrievalChain with the original query
+                result = qa.invoke({"question": input_prompt})
+
                 # Get the response
                 english_response = result["answer"]
-                
-                # Translate back to user's language if needed
-                final_response = english_response
+
+                # Translate the response to the target language
                 if current_language != "English":
                     final_response = translate_text(english_response, "English", current_language)
-                
+                else:
+                    final_response = english_response
+
                 # Display with typing effect
                 message_placeholder = st.empty()
                 full_response = ""
-                
+
                 # Process character by character for the typing effect
                 for char in final_response:
                     full_response += char
                     time.sleep(0.01)  # Slightly faster typing effect
                     message_placeholder.markdown(full_response + " ▌")
-                
+
                 message_placeholder.markdown(full_response)
-                
+
         # Store response
-        st.session_state.messages_per_category[current_category].append({"role": "assistant", "content": full_response})
+        st.session_state.messages_per_category[current_category].append({"role": "assistant", "content": final_response})
 
 # Call the show function of the selected category
 categories[st.session_state.selected_category].show(run_chatbot)
