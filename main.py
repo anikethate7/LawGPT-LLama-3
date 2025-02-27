@@ -163,10 +163,11 @@ def translate_text(text, source_lang, target_lang):
 
     llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
     translation_prompt = f"""
-    You are a professional translator specializing in legal documents. 
-    Translate the following text from {source_lang} to {target_lang}. 
-    Keep the meaning intact and maintain legal terminology accuracy.
-    **Respond with ONLY the translated text, without any introductory phrases or explanations.**
+    You are a professional legal translator.  
+Translate the following text from {source_lang} to {target_lang} while preserving legal accuracy and meaning.  
+Ensure the translation is clear, concise, and easy to understand.  
+**Format the response in a structured and readable manner using short paragraphs, bullet points, and proper spacing.**  
+**Provide only the translated text without any introductory phrases or explanations.**
 
     {text}
     """
