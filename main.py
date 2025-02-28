@@ -283,16 +283,16 @@ def show_scale_loader():
         </div>
     """, unsafe_allow_html=True)
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_embeddings():
     return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_vector_store(_embeddings):
     # The embeddings are not hashable, so we prevent Streamlit from hashing them.
     return FAISS.load_local("my_vector_store", _embeddings, allow_dangerous_deserialization=True)
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_llm():
     return ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
 
