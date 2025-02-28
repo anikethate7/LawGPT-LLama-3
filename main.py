@@ -48,6 +48,9 @@ if "messages_per_category" not in st.session_state:
 if "selected_language" not in st.session_state:
     st.session_state.selected_language = "English"
 
+if "loading" not in st.session_state:
+    st.session_state.loading = False
+
 # Ensure sidebar remains the same in both light and dark mode
 st.markdown("""
     <style>
@@ -113,9 +116,134 @@ st.markdown("""
         background: #18182b !important;
         color: white !important;
     }
+    
+    /* Custom loader */
+    .custom-loader {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    
+    .loader-dot {
+        width: 12px;
+        height: 12px;
+        margin: 0 5px;
+        border-radius: 50%;
+        background-color: #18182b;
+        display: inline-block;
+        animation: bounce 1.5s infinite ease-in-out;
+    }
+    
+    .loader-dot:nth-child(1) {
+        animation-delay: 0s;
+    }
+    
+    .loader-dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    
+    .loader-dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+    
+    @keyframes bounce {
+        0%, 80%, 100% {
+            transform: scale(0);
+            opacity: 0.5;
+        }
+        40% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    
+    /* Adjust loader in dark mode */
+    html[theme="dark"] .loader-dot {
+        background-color: #f0f2f6;
+    }
+    
+    /* Legal balanced scale loader */
+    .scale-loader {
+        width: 100px;
+        height: 100px;
+        position: relative;
+        margin: 20px auto;
+    }
+    
+    .scale-bar {
+        width: 100px;
+        height: 8px;
+        background-color: #18182b;
+        position: absolute;
+        top: 50%;
+        left: 0;
+        transform-origin: center;
+        animation: balance 3s infinite ease-in-out;
+        border-radius: 4px;
+    }
+    
+    .scale-left, .scale-right {
+        width: 40px;
+        height: 40px;
+        background-color: rgba(24, 24, 43, 0.7);
+        border-radius: 4px;
+        position: absolute;
+        bottom: -25px;
+    }
+    
+    .scale-left {
+        left: 0;
+    }
+    
+    .scale-right {
+        right: 0;
+    }
+    
+    .scale-stand {
+        width: 8px;
+        height: 70px;
+        background-color: #18182b;
+        position: absolute;
+        bottom: -55px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 4px;
+    }
+    
+    .scale-base {
+        width: 60px;
+        height: 8px;
+        background-color: #18182b;
+        position: absolute;
+        bottom: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 4px;
+    }
+    
+    @keyframes balance {
+        0%, 100% {
+            transform: rotate(-10deg);
+        }
+        50% {
+            transform: rotate(10deg);
+        }
+    }
+    
+    /* Adjust scale loader in dark mode */
+    html[theme="dark"] .scale-bar,
+    html[theme="dark"] .scale-stand,
+    html[theme="dark"] .scale-base {
+        background-color: #f0f2f6;
+    }
+    
+    html[theme="dark"] .scale-left,
+    html[theme="dark"] .scale-right {
+        background-color: rgba(240, 242, 246, 0.7);
+    }
     </style>
 """, unsafe_allow_html=True)
-
 
 # Sidebar UI
 with st.sidebar:
@@ -143,6 +271,18 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-footer">🛡️ Stay legally informed.</div>', unsafe_allow_html=True)
 
+# Custom loader components
+def show_scale_loader():
+    st.markdown("""
+        <div class="scale-loader">
+            <div class="scale-bar"></div>
+            <div class="scale-left"></div>
+            <div class="scale-right"></div>
+            <div class="scale-stand"></div>
+            <div class="scale-base"></div>
+        </div>
+    """, unsafe_allow_html=True)
+
 @st.cache_resource
 def load_embeddings():
     return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
@@ -156,19 +296,28 @@ def load_vector_store(_embeddings):
 def load_llm():
     return ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def translate_text(text, source_lang, target_lang):
     if source_lang == target_lang:
         return text
 
     llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-70b-8192")
     translation_prompt = f"""
-    You are a professional legal translator.  
-Translate the following text from {source_lang} to {target_lang} while preserving legal accuracy and meaning.  
-Ensure the translation is clear, concise, and easy to understand.  
-**Format the response in a structured and readable manner using short paragraphs, bullet points, and proper spacing.**  
-**Provide only the translated text without any introductory phrases or explanations.**
+    You are a professional legal translator with expertise in accurately translating legal documents while preserving their precise meaning and intent.
 
+Task:
+Translate the following text from {source_lang} to {target_lang}, ensuring that the legal terminology, nuances, and context remain intact. The translation must be legally accurate and convey the original intent without any misinterpretation or ambiguity.
+
+Guidelines:
+
+Legal Precision: Maintain the original legal meaning, terminology, and structure. Avoid altering or omitting any critical legal details.
+Clarity & Readability: Ensure the translation is clear, concise, and easy to understand while preserving formal legal language.
+Structured Formatting: Use short paragraphs, bullet points, and proper spacing to enhance readability.
+No Additional Content: Provide only the translated text without any introductory phrases, explanations, or extra notes.
+Output Format:
+
+Strictly translated legal text without any personal interpretation.
+Well-organized and properly formatted text to ensure readability and professional presentation.
     {text}
     """
     response = llm.invoke(translation_prompt)
@@ -220,30 +369,44 @@ def run_chatbot():
 
         # Process the query
         with st.chat_message("assistant"):
-            with st.status(f"Thinking 💡...", expanded=True):
-                # Use the ConversationalRetrievalChain with the original query
-                result = qa.invoke({"question": input_prompt})
+            # Set loading state
+            st.session_state.loading = True
+            
+            # Show custom loader
+            loader_container = st.empty()
+            with loader_container.container():
+                show_scale_loader()
+                st.markdown("<p style='text-align:center;'></p>", unsafe_allow_html=True)
+            
+            # Use the ConversationalRetrievalChain with the original query
+            result = qa.invoke({"question": input_prompt})
 
-                # Get the response
-                english_response = result["answer"]
+            # Get the response
+            english_response = result["answer"]
 
-                # Translate the response to the target language
-                if current_language != "English":
-                    final_response = translate_text(english_response, "English", current_language)
-                else:
-                    final_response = english_response
+            # Translate the response to the target language
+            if current_language != "English":
+                final_response = translate_text(english_response, "English", current_language)
+            else:
+                final_response = english_response
 
-                # Display with typing effect
-                message_placeholder = st.empty()
-                full_response = ""
+            # Clear the loader
+            loader_container.empty()
+            
+            # Display with typing effect
+            message_placeholder = st.empty()
+            full_response = ""
 
-                # Process character by character for the typing effect
-                for char in final_response:
-                    full_response += char
-                    time.sleep(0.01)  # Slightly faster typing effect
-                    message_placeholder.markdown(full_response + " ▌")
+            # Process character by character for the typing effect
+            for char in final_response:
+                full_response += char
+                time.sleep(0.01)  # Slightly faster typing effect
+                message_placeholder.markdown(full_response + " ▌")
 
-                message_placeholder.markdown(full_response)
+            message_placeholder.markdown(full_response)
+            
+            # Reset loading state
+            st.session_state.loading = False
 
         # Store response
         st.session_state.messages_per_category[current_category].append({"role": "assistant", "content": final_response})
